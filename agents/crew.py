@@ -39,7 +39,11 @@ def run_dispute_crew(chargeback_id: str, transaction_id: str, chargeback_meta: d
     Orchestrate all agents and return a structured DisputeEvidence object
     ready to be rendered into a PDF.
     """
-    llm = LLM(model="anthropic/claude-sonnet-4-6", api_key=os.environ["ANTHROPIC_API_KEY"])
+    llm = LLM(
+        model="openai/gpt-oss-120b",
+        api_key=os.environ["GROQ_API_KEY"],
+        api_base="https://api.groq.com/openai/v1",
+    )
 
     # ------------------------------------------------------------------
     # Agents

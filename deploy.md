@@ -8,6 +8,7 @@
 | Render | 750 hours/month (sleeps after 15 min idle) |
 | Railway | $5 credit/month (no sleep) |
 | Fly.io | 3 shared VMs, 256 MB RAM each (no sleep) |
+| Groq | Free tier — fast inference, generous rate limits |
 | Composio | Free tier for integrations |
 | ipinfo.io | 50k lookups/month |
 
@@ -26,7 +27,7 @@
    - Create a Serverless cluster
    - Go to **Connect** → copy the connection string
 
-3. **Anthropic API key** — [console.anthropic.com](https://console.anthropic.com)
+3. **Groq API key** (free) — [console.groq.com](https://console.groq.com)
 
 4. **Composio API key** (optional, for email submission) — [app.composio.dev](https://app.composio.dev)
 
@@ -44,7 +45,7 @@ uv sync
 
 # 2. Configure environment
 cp .env.example .env
-# Edit .env — at minimum set DATABASE_URL and ANTHROPIC_API_KEY
+# Edit .env — at minimum set DATABASE_URL and GROQ_API_KEY
 
 # 3. Seed the database
 uv run seed.py
@@ -91,7 +92,7 @@ Render is the simplest path: connect your GitHub repo and it deploys automatical
 
    ```
    DATABASE_URL        = mysql://user:pass@host:4000/chargebacks?sslaccept=strict
-   ANTHROPIC_API_KEY   = sk-ant-...
+   GROQ_API_KEY        = gsk_...
    COMPOSIO_API_KEY    = ...
    DISPUTE_RECIPIENT_EMAIL = disputes@yourprocessor.com
    SKYFIRE_API_KEY     = ...
@@ -156,7 +157,7 @@ fly launch --name chargeback-agent --region ord --no-deploy
 # Set secrets
 fly secrets set \
   DATABASE_URL="mysql://..." \
-  ANTHROPIC_API_KEY="sk-ant-..." \
+  GROQ_API_KEY="gsk_..." \
   COMPOSIO_API_KEY="..." \
   SKYFIRE_API_KEY="..." \
   IPINFO_TOKEN="..." \
@@ -189,7 +190,7 @@ CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
 | `TIDB_USER` | Yes* | TiDB username |
 | `TIDB_PASSWORD` | Yes* | TiDB password |
 | `TIDB_DATABASE` | Yes* | Database name (default: `chargebacks`) |
-| `ANTHROPIC_API_KEY` | Yes | Powers CrewAI agents |
+| `GROQ_API_KEY` | Yes | Powers CrewAI agents via Groq (free tier available) |
 | `COMPOSIO_API_KEY` | No | Email submission via Composio |
 | `DISPUTE_RECIPIENT_EMAIL` | No | Where to email the dispute PDF |
 | `SKYFIRE_API_KEY` | No | Micro-payments for enrichment APIs |

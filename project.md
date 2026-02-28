@@ -16,7 +16,7 @@ Merchants lose ~40% of chargeback disputes by default — not because they're wr
 |---|---|---|
 | API | FastAPI | Webhook receiver, REST endpoints |
 | Agents | CrewAI | Multi-agent orchestration |
-| LLM | Anthropic Claude (claude-sonnet-4-6) | Agent reasoning via LiteLLM |
+| LLM | Groq (gpt-oss-120b) | Agent reasoning via LiteLLM OpenAI-compatible endpoint |
 | Database | TiDB Serverless (MySQL-compatible) | Transaction, chargeback, customer data |
 | DB driver | PyMySQL | Direct MySQL driver, no ORM |
 | PDF | ReportLab | Evidence package generation |
@@ -131,9 +131,10 @@ SSL uses `ssl_verify_cert=True, ssl_verify_identity=True` (correct pymysql param
 - **No ORM** — all DB access is raw PyMySQL with `DictCursor`. Keep it that way.
 - **No background workers** — FastAPI `BackgroundTasks` handles async work. For production scale, swap for Celery/ARQ.
 - **Graceful degradation** — missing optional credentials (Composio, Skyfire, ipinfo) are logged as warnings, not errors. The pipeline continues.
-- **Model** — always use `anthropic/claude-sonnet-4-6` (LiteLLM provider-prefixed format). The plain `claude-sonnet-4-6` works too but the prefixed form is explicit.
+- **Model** — always use `openai/gpt-oss-120b` with `api_base="https://api.groq.com/openai/v1"` and `api_key=GROQ_API_KEY`. The `openai/` prefix tells LiteLLM to use the OpenAI SDK client against Groq's endpoint.
 - **Python version** — 3.11+. Type hints use `X | Y` union syntax (not `Optional[X]`).
 - **uv** — use `uv run <script>` and `uv sync`. Do not use `pip install` directly.
+- **LLM env var** — `GROQ_API_KEY` (not `ANTHROPIC_API_KEY`). Groq is free tier.
 
 ---
 

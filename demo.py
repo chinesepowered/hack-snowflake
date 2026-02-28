@@ -57,7 +57,7 @@ def run_crew_and_generate_pdf():
 
 if __name__ == "__main__":
     # Quick env check
-    missing = [k for k in ("TIDB_HOST", "TIDB_USER", "TIDB_PASSWORD", "ANTHROPIC_API_KEY") if not os.environ.get(k)]
+    missing = [k for k in ("TIDB_HOST", "TIDB_USER", "TIDB_PASSWORD", "GROQ_API_KEY") if not os.environ.get(k)]
     if missing:
         print(f"ERROR: Missing required env vars: {', '.join(missing)}")
         print("Copy .env.example to .env and fill in your credentials.")

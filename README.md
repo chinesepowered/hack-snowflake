@@ -54,7 +54,7 @@ Every dispute PDF contains:
 
 ## Quick start
 
-**Requirements:** [uv](https://docs.astral.sh/uv/), a [TiDB Serverless](https://tidbcloud.com) cluster, an [Anthropic API key](https://console.anthropic.com).
+**Requirements:** [uv](https://docs.astral.sh/uv/), a [TiDB Serverless](https://tidbcloud.com) cluster, a [Groq API key](https://console.groq.com) (free).
 
 ```bash
 # Install dependencies
@@ -62,7 +62,7 @@ uv sync
 
 # Configure
 cp .env.example .env
-# Set DATABASE_URL and ANTHROPIC_API_KEY in .env
+# Set DATABASE_URL and GROQ_API_KEY in .env
 
 # Bootstrap the database
 uv run seed.py
@@ -113,4 +113,4 @@ Deploys free to [Render](https://render.com), [Railway](https://railway.app), or
 
 ## Stack
 
-Python 3.11 · FastAPI · CrewAI · Claude · TiDB Serverless · ReportLab · Composio · Skyfire · uv
+Python 3.11 · FastAPI · CrewAI · Groq · TiDB Serverless · ReportLab · Composio · Skyfire · uv
