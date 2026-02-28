@@ -45,6 +45,7 @@ log = logging.getLogger("dispute-agent")
 PDF_OUTPUT_DIR = os.environ.get("PDF_OUTPUT_DIR", "./output")
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 COMPOSIO_API_KEY = os.environ.get("COMPOSIO_API_KEY", "")
+MOCK_EMAIL = os.environ.get("MOCK_EMAIL", "").lower() in ("1", "true", "yes")
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +157,10 @@ async def _submit_via_composio(
     Composio provides pre-built integrations for Gmail, Outlook, and Stripe Disputes API.
     We call Composio's action execution endpoint directly here.
     """
+    if MOCK_EMAIL:
+        log.info("[MOCK] Email submission skipped (MOCK_EMAIL=true) — PDF saved at %s", pdf_path)
+        return
+
     if not COMPOSIO_API_KEY:
         log.warning("COMPOSIO_API_KEY not set — skipping submission")
         return
