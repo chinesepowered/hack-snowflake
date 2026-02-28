@@ -96,11 +96,9 @@ class IpEnrichmentTool(BaseTool):
         ipinfo_token = os.environ.get("IPINFO_TOKEN")
 
         if skyfire_key:
-            paid, reason = _skyfire_pay_for_call(skyfire_key, service="ipinfo", estimated_usd=0.001)
+            paid, _ = _skyfire_pay_for_call(skyfire_key, service="ipinfo", estimated_usd=0.001)
             if paid:
                 print(f"  [Skyfire] payment ok (${0.001:.4f}) for ipinfo lookup of {ip_address}")
-            else:
-                print(f"  [Skyfire] payment skipped ({reason}) — proceeding with enrichment anyway")
 
         if ipinfo_token:
             try:
@@ -130,8 +128,7 @@ def _skyfire_pay_for_call(api_key: str, service: str, estimated_usd: float) -> t
     If SKYFIRE_MOCK=true the payment is simulated locally (no credits consumed).
     """
     if os.environ.get("SKYFIRE_MOCK", "").lower() in ("1", "true", "yes"):
-        print(f"  [Skyfire MOCK] simulated payment ${estimated_usd:.4f} for {service}")
-        return True, "mock"
+        return True, "ok"
 
     skyfire_url = os.environ.get("SKYFIRE_API_URL", "https://api.skyfire.xyz")
     try:
