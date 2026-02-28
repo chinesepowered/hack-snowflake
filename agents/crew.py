@@ -11,8 +11,7 @@ import json
 import os
 from dataclasses import dataclass
 
-from crewai import Agent, Crew, Process, Task
-from crewai.llm import LLM
+from crewai import LLM, Agent, Crew, Process, Task
 from dotenv import load_dotenv
 
 from agents.tools import (
@@ -40,7 +39,7 @@ def run_dispute_crew(chargeback_id: str, transaction_id: str, chargeback_meta: d
     Orchestrate all agents and return a structured DisputeEvidence object
     ready to be rendered into a PDF.
     """
-    llm = LLM(model="claude-sonnet-4-6", api_key=os.environ["ANTHROPIC_API_KEY"])
+    llm = LLM(model="anthropic/claude-sonnet-4-6", api_key=os.environ["ANTHROPIC_API_KEY"])
 
     # ------------------------------------------------------------------
     # Agents
