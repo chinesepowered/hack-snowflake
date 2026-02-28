@@ -9,15 +9,15 @@ Merchants lose billions to chargebacks every year — not because the transactio
 ## How it works
 
 ```
-Chargeback webhook
+Chargeback webhook  ──or──  Dashboard "Run Dispute" button
        ↓
   CrewAI pipeline
-  ┌─────────────────────────────────────────┐
-  │  1. Data Agent        → TiDB Serverless │  purchase history, IP logs, billing details
-  │  2. Enrichment Agent  → ipinfo.io       │  geolocation, ISP, IP transaction history
-  │  3. Analyst Agent     → Claude          │  dispute narrative tailored to reason code
-  │  4. Coordinator       → compiles all    │  structured evidence package
-  └─────────────────────────────────────────┘
+  ┌─────────────────────────────────────────────────────┐
+  │  1. Data Agent        → TiDB Serverless             │  purchase history, IP logs, billing details
+  │  2. Enrichment Agent  → Skyfire → ipinfo.io         │  geolocation, ISP, IP transaction cross-ref
+  │  3. Analyst Agent     → Groq (gpt-oss-120b)         │  dispute narrative tailored to reason code
+  │  4. Coordinator       → compiles all                │  structured evidence package
+  └─────────────────────────────────────────────────────┘
        ↓
   PDF evidence package (ReportLab)
        ↓
@@ -27,6 +27,18 @@ Chargeback webhook
 ```
 
 The whole pipeline runs as a background task. Your webhook endpoint returns 202 immediately.
+
+---
+
+## Dashboard
+
+Open `http://localhost:8000` after starting the server for a live ops dashboard:
+
+- **Stats** — Total / Open / Under Review / Submitted counts at a glance
+- **Chargebacks table** — all cases with customer info, amounts, reason codes, due dates, and status badges
+- **Run Dispute button** — confirm and trigger the AI pipeline for any open chargeback
+- **Live polling** — status updates every 4 seconds while a pipeline runs, no manual refresh needed
+- **Health indicator** — shows whether the FastAPI server is reachable
 
 ---
 
@@ -45,8 +57,9 @@ Every dispute PDF contains:
 
 | | |
 |---|---|
-| **TiDB Serverless** | MySQL-compatible database — stores all transaction and chargeback data. Free tier: 5 GB, 250M request units/month. |
-| **CrewAI** | Multi-agent orchestration — four specialized agents work in sequence to gather and analyze evidence. |
+| **TiDB Serverless** | MySQL-compatible serverless database — stores all transaction, chargeback, and customer event data. SSL-enforced; works with a plain `DATABASE_URL` (no extra config). |
+| **Groq** | LLM inference — all four CrewAI agents run on `gpt-oss-120b` via Groq's OpenAI-compatible endpoint. Fast, with generous free-tier rate limits. |
+| **CrewAI** | Multi-agent orchestration — four specialized agents work sequentially to gather, enrich, analyse, and package evidence. |
 | **Composio** | Pre-built integrations — sends the dispute PDF via Gmail, Outlook, or directly through the Stripe Disputes API. |
 | **Skyfire** | Agent-native payments — the enrichment agent autonomously pays for external API calls (IP geolocation) without human involvement. |
 
@@ -62,22 +75,28 @@ uv sync
 
 # Configure
 cp .env.example .env
-# Set DATABASE_URL and GROQ_API_KEY in .env
+# Edit .env — set DATABASE_URL and GROQ_API_KEY at minimum
 
-# Bootstrap the database
+# Bootstrap the database (5 chargebacks across 3 customers, 5 reason codes)
 uv run seed.py
 
 # Start the server
 uv run uvicorn main:app --reload
+# → open http://localhost:8000 for the dashboard
 ```
 
-**Trigger a dispute manually:**
+**Trigger a dispute from the dashboard** or via curl:
 ```bash
 curl -X POST http://localhost:8000/dispute/cb_demo_001
 curl http://localhost:8000/dispute/cb_demo_001/status
 ```
 
-**Run the full demo without a server:**
+**Reset all demo chargebacks back to open (for re-demos, no reseed needed):**
+```bash
+uv run seed.py --reset
+```
+
+**Run the full pipeline without a server:**
 ```bash
 uv run demo.py
 # → generates a PDF in ./output/
@@ -103,14 +122,16 @@ Deploys free to [Render](https://render.com), [Railway](https://railway.app), or
 
 | Method | Path | Description |
 |---|---|---|
+| `GET` | `/` | Dashboard UI |
+| `GET` | `/chargebacks` | List all chargebacks (JSON) |
 | `POST` | `/webhook/chargeback` | Stripe webhook (auto-trigger) |
 | `POST` | `/dispute/{id}` | Manually trigger pipeline for a chargeback |
 | `GET` | `/dispute/{id}/status` | Check status and PDF path |
-| `GET` | `/docs` | Interactive API docs |
 | `GET` | `/health` | Liveness check |
+| `GET` | `/docs` | Interactive API docs (Swagger UI) |
 
 ---
 
 ## Stack
 
-Python 3.11 · FastAPI · CrewAI · Groq · TiDB Serverless · ReportLab · Composio · Skyfire · uv
+Python 3.11 · FastAPI · CrewAI · Groq (`gpt-oss-120b`) · LiteLLM · TiDB Serverless · PyMySQL · ReportLab · Composio · Skyfire · uv
