@@ -96,8 +96,11 @@ class IpEnrichmentTool(BaseTool):
         ipinfo_token = os.environ.get("IPINFO_TOKEN")
 
         if skyfire_key:
-            # Pay for the enrichment call via Skyfire before making it
-            _skyfire_pay_for_call(skyfire_key, service="ipinfo", estimated_usd=0.001)
+            paid, reason = _skyfire_pay_for_call(skyfire_key, service="ipinfo", estimated_usd=0.001)
+            if paid:
+                print(f"  [Skyfire] payment ok (${0.001:.4f}) for ipinfo lookup of {ip_address}")
+            else:
+                print(f"  [Skyfire] payment skipped ({reason}) — proceeding with enrichment anyway")
 
         if ipinfo_token:
             try:
@@ -118,14 +121,21 @@ class IpEnrichmentTool(BaseTool):
         })
 
 
-def _skyfire_pay_for_call(api_key: str, service: str, estimated_usd: float) -> None:
+def _skyfire_pay_for_call(api_key: str, service: str, estimated_usd: float) -> tuple[bool, str]:
     """
     Initiate a micro-payment through Skyfire so the agent autonomously covers
     the cost of the enrichment API call it is about to make.
+
+    Returns (success, reason) — always non-fatal; enrichment proceeds either way.
+    If SKYFIRE_MOCK=true the payment is simulated locally (no credits consumed).
     """
+    if os.environ.get("SKYFIRE_MOCK", "").lower() in ("1", "true", "yes"):
+        print(f"  [Skyfire MOCK] simulated payment ${estimated_usd:.4f} for {service}")
+        return True, "mock"
+
     skyfire_url = os.environ.get("SKYFIRE_API_URL", "https://api.skyfire.xyz")
     try:
-        httpx.post(
+        resp = httpx.post(
             f"{skyfire_url}/v1/payments",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={
@@ -135,6 +145,11 @@ def _skyfire_pay_for_call(api_key: str, service: str, estimated_usd: float) -> N
             },
             timeout=8,
         )
-    except Exception:
-        # Non-fatal: enrichment call proceeds regardless
-        pass
+        if resp.status_code == 402:
+            return False, "insufficient_credits"
+        resp.raise_for_status()
+        return True, "ok"
+    except httpx.HTTPStatusError as exc:
+        return False, f"http_{exc.response.status_code}"
+    except Exception as exc:
+        return False, str(exc)
