@@ -24,9 +24,14 @@ def _parse_database_url(url: str) -> dict:
     parsed = urlparse(url)
     # Strip driver prefix (mysql+pymysql → mysql)
     qs = parse_qs(parsed.query)
-    # Detect SSL from common query params
+    # Default SSL on; only disable if URL explicitly opts out (ssl=false/0/disable/no/none)
     ssl_params = {"sslaccept", "ssl", "ssl_mode", "tls"}
-    use_ssl = bool(ssl_params & set(k.lower() for k in qs))
+    no_ssl_values = {"false", "0", "disable", "no", "none"}
+    use_ssl = not any(
+        str(v[0]).lower() in no_ssl_values
+        for k, v in qs.items()
+        if k.lower() in ssl_params
+    )
     return {
         "host": parsed.hostname,
         "port": parsed.port or 4000,
