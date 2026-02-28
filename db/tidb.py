@@ -7,11 +7,11 @@ Connection priority:
   2. Individual TIDB_HOST / TIDB_USER / TIDB_PASSWORD / TIDB_DATABASE vars
 """
 import os
-import ssl
 from datetime import datetime
 from typing import Optional
 from urllib.parse import parse_qs, urlparse
 
+import certifi
 import pymysql
 import pymysql.cursors
 from dotenv import load_dotenv
@@ -53,7 +53,7 @@ def _get_connection():
         use_ssl = True  # TiDB Serverless always requires SSL
 
     if use_ssl:
-        kwargs["ssl"] = ssl.create_default_context()
+        kwargs["ssl"] = {"ca": certifi.where()}
 
     return pymysql.connect(
         **kwargs,

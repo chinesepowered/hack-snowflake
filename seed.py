@@ -12,10 +12,10 @@ Usage:
     python seed.py          # with plain python (after pip install -r requirements.txt)
 """
 import os
-import ssl
 import sys
 from urllib.parse import parse_qs, urlparse
 
+import certifi
 import pymysql
 import pymysql.cursors
 from dotenv import load_dotenv
@@ -58,7 +58,7 @@ def _get_conn_kwargs() -> tuple[dict, str]:
         }
 
     if use_ssl:
-        kwargs["ssl"] = ssl.create_default_context()
+        kwargs["ssl"] = {"ca": certifi.where()}
 
     return kwargs, database
 
