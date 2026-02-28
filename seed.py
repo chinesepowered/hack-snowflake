@@ -34,7 +34,13 @@ def _get_conn_kwargs() -> tuple[dict, str]:
         parsed = urlparse(url)
         qs = parse_qs(parsed.query)
         ssl_params = {"sslaccept", "ssl", "ssl_mode", "tls"}
-        use_ssl = bool(ssl_params & {k.lower() for k in qs})
+        # Default to SSL on; only disable if URL explicitly says ssl=false/0/disable
+        no_ssl_values = {"false", "0", "disable", "no", "none"}
+        use_ssl = not any(
+            str(v[0]).lower() in no_ssl_values
+            for k, v in qs.items()
+            if k.lower() in ssl_params
+        )
         database = (parsed.path or "").lstrip("/") or "chargebacks"
         kwargs = {
             "host": parsed.hostname,
