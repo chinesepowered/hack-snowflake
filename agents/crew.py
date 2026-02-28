@@ -40,9 +40,8 @@ def run_dispute_crew(chargeback_id: str, transaction_id: str, chargeback_meta: d
     ready to be rendered into a PDF.
     """
     llm = LLM(
-        model="openai/gpt-oss-120b",
+        model="groq/llama-3.3-70b-versatile",
         api_key=os.environ["GROQ_API_KEY"],
-        api_base="https://api.groq.com/openai/v1",
     )
 
     # ------------------------------------------------------------------
