@@ -23,6 +23,11 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 
+# Suppress noisy LiteLLM internal loggers (apscheduler/proxy warnings unrelated to our usage)
+logging.getLogger("LiteLLM").setLevel(logging.WARNING)
+logging.getLogger("LiteLLM Router").setLevel(logging.WARNING)
+logging.getLogger("LiteLLM Proxy").setLevel(logging.WARNING)
+
 import httpx
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request, status

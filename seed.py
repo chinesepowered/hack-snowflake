@@ -158,12 +158,41 @@ TRANSACTIONS = [
      "203.0.113.42", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
      "123 Main St, New York, NY 10001", "123 Main St, New York, NY 10001",
      "NOW() - INTERVAL 5 DAY"),
+    # Bob — 2 purchases, Mastercard, consistent IP
+    ("txn_demo_004", "cus_bob456", "bob@example.com", "Bob Johnson",
+     24999, "USD", "completed", "card", "5678", "Mastercard",
+     "198.51.100.77", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+     "456 Oak Ave, Chicago, IL 60601", "456 Oak Ave, Chicago, IL 60601",
+     "NOW() - INTERVAL 45 DAY"),
+    ("txn_demo_005", "cus_bob456", "bob@example.com", "Bob Johnson",
+     2499, "USD", "completed", "card", "5678", "Mastercard",
+     "198.51.100.77", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+     "456 Oak Ave, Chicago, IL 60601", "456 Oak Ave, Chicago, IL 60601",
+     "NOW() - INTERVAL 20 DAY"),
+    # Carol — 1 purchase, Amex
+    ("txn_demo_006", "cus_carol789", "carol@example.com", "Carol Williams",
+     5999, "USD", "completed", "card", "9876", "Amex",
+     "203.0.113.15", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15",
+     "789 Pine St, Seattle, WA 98101", "789 Pine St, Seattle, WA 98101",
+     "NOW() - INTERVAL 10 DAY"),
 ]
 
 CHARGEBACKS = [
     ("cb_demo_001", "txn_demo_001", "fraud",
      "Customer claims transaction was unauthorized", 9999, "USD",
      "open", "NOW() + INTERVAL 7 DAY"),
+    ("cb_demo_002", "txn_demo_004", "credit_not_processed",
+     "Customer claims promised refund was never issued", 24999, "USD",
+     "open", "NOW() + INTERVAL 14 DAY"),
+    ("cb_demo_003", "txn_demo_006", "product_not_received",
+     "Customer states item was never delivered", 5999, "USD",
+     "open", "NOW() + INTERVAL 3 DAY"),
+    ("cb_demo_004", "txn_demo_005", "duplicate",
+     "Customer claims the same charge appears twice on their statement", 2499, "USD",
+     "open", "NOW() + INTERVAL 10 DAY"),
+    ("cb_demo_005", "txn_demo_003", "product_unacceptable",
+     "Customer claims item received was significantly not as described", 1999, "USD",
+     "open", "NOW() + INTERVAL 5 DAY"),
 ]
 
 EVENTS = [
@@ -192,7 +221,22 @@ EVENTS = [
 # Main
 # ---------------------------------------------------------------------------
 
+def reset_chargebacks(cur) -> None:
+    """Reset all demo chargebacks to open status (for re-demo without reseeding)."""
+    ids = [cb[0] for cb in CHARGEBACKS]
+    placeholders = ", ".join(["%s"] * len(ids))
+    cur.execute(
+        f"""UPDATE chargebacks
+            SET status = 'open', pdf_path = NULL, dispute_submitted_at = NULL
+            WHERE chargeback_id IN ({placeholders})""",
+        ids,
+    )
+    print(f"Reset {len(ids)} chargebacks → status=open")
+
+
 def main():
+    reset_only = "--reset" in sys.argv
+
     conn_kwargs, database = _get_conn_kwargs()
 
     print(f"Connecting to {conn_kwargs.get('host')}:{conn_kwargs.get('port')} ...")
@@ -203,10 +247,15 @@ def main():
             cur.execute(f"CREATE DATABASE IF NOT EXISTS `{database}`")
             print(f"Database `{database}` ready.")
 
-    # Step 2: connect to the database and create tables
+    # Step 2: connect to the database and create tables / reset
     with pymysql.connect(**conn_kwargs, database=database,
                          cursorclass=pymysql.cursors.DictCursor, autocommit=True) as conn:
         with conn.cursor() as cur:
+            if reset_only:
+                reset_chargebacks(cur)
+                print("Done. Re-run the dispute pipeline from the dashboard.")
+                return
+
             print("Creating tables...")
             for stmt in CREATE_TABLES.strip().split(";"):
                 stmt = stmt.strip()
@@ -243,13 +292,12 @@ def main():
 
     print()
     print("Done. Sample data loaded:")
-    print("  Transactions : txn_demo_001, txn_demo_002, txn_demo_003")
-    print("  Chargeback   : cb_demo_001  (status=open, 7 days to respond)")
-    print("  Customer     : cus_abc123 / alice@example.com")
+    print("  Transactions : txn_demo_001–006  (Alice ×3, Bob ×2, Carol ×1)")
+    print("  Chargebacks  : cb_demo_001–005  (fraud, credit_not_processed,")
+    print("                  product_not_received, duplicate, product_unacceptable)")
     print()
-    print("To trigger the dispute pipeline:")
-    print("  uv run uvicorn main:app --reload")
-    print("  curl -X POST http://localhost:8000/dispute/cb_demo_001")
+    print("To trigger disputes:  uv run uvicorn main:app --reload")
+    print("To reset for re-demo: uv run seed.py --reset")
 
 
 if __name__ == "__main__":
