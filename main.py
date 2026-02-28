@@ -28,6 +28,9 @@ logging.getLogger("LiteLLM").setLevel(logging.CRITICAL)
 logging.getLogger("LiteLLM Router").setLevel(logging.CRITICAL)
 logging.getLogger("LiteLLM Proxy").setLevel(logging.CRITICAL)
 logging.getLogger("litellm").setLevel(logging.CRITICAL)
+# Suppress OpenAI client retry INFO chatter (Groq occasionally returns empty on first attempt)
+logging.getLogger("openai").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 import httpx
 from dotenv import load_dotenv
