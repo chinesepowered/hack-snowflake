@@ -12,6 +12,7 @@ Usage:
     python seed.py          # with plain python (after pip install -r requirements.txt)
 """
 import os
+import ssl
 import sys
 from urllib.parse import parse_qs, urlparse
 
@@ -57,8 +58,7 @@ def _get_conn_kwargs() -> tuple[dict, str]:
         }
 
     if use_ssl:
-        kwargs["ssl_verify_cert"] = True
-        kwargs["ssl_verify_identity"] = True
+        kwargs["ssl"] = ssl.create_default_context()
 
     return kwargs, database
 
