@@ -40,8 +40,9 @@ def run_dispute_crew(chargeback_id: str, transaction_id: str, chargeback_meta: d
     ready to be rendered into a PDF.
     """
     llm = LLM(
-        model="openai/gpt-oss-120b",
-        api_key=os.environ["OPENAI_API_KEY"],
+        model="openai/openai/gpt-oss-120b",  # LiteLLM strips the first 'openai/' (provider prefix); Groq receives 'openai/gpt-oss-120b'
+        api_key=os.environ["GROQ_API_KEY"],
+        api_base="https://api.groq.com/openai/v1",
     )
 
     # ------------------------------------------------------------------
