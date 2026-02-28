@@ -26,6 +26,7 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from agents.crew import run_dispute_crew
@@ -202,6 +203,20 @@ async def _submit_via_composio(
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
+@app.get("/", include_in_schema=False)
+async def frontend():
+    return FileResponse("frontend/index.html")
+
+
+@app.get("/chargebacks")
+async def list_chargebacks():
+    rows = tidb.list_chargebacks()
+    return [
+        {k: str(v) if isinstance(v, datetime) else v for k, v in row.items()}
+        for row in rows
+    ]
+
 
 @app.get("/health")
 async def health():

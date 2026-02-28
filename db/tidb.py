@@ -140,6 +140,27 @@ def get_ip_transactions(ip_address: str) -> list[dict]:
             return cur.fetchall()
 
 
+def list_chargebacks(limit: int = 200) -> list[dict]:
+    """All chargebacks newest-first, joined with transaction customer info."""
+    with _get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT c.chargeback_id, c.transaction_id, c.reason_code,
+                       c.reason_description, c.amount_cents, c.currency,
+                       c.status, c.evidence_due_by, c.pdf_path,
+                       c.dispute_submitted_at, c.created_at,
+                       t.customer_email, t.customer_name
+                FROM chargebacks c
+                LEFT JOIN transactions t ON c.transaction_id = t.transaction_id
+                ORDER BY c.created_at DESC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+            return cur.fetchall()
+
+
 def update_chargeback_status(
     chargeback_id: str,
     status: str,
