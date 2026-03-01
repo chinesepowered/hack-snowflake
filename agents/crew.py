@@ -40,7 +40,7 @@ def run_dispute_crew(chargeback_id: str, transaction_id: str, chargeback_meta: d
     ready to be rendered into a PDF.
     """
     llm = LLM(
-        model="openai/gpt-oss-120b",
+        model="openai/openai/gpt-oss-120b",  # LiteLLM strips the first 'openai/' (provider prefix); Groq receives 'openai/gpt-oss-120b'
         api_key=os.environ["GROQ_API_KEY"],
         api_base="https://api.groq.com/openai/v1",
     )
@@ -116,12 +116,12 @@ def run_dispute_crew(chargeback_id: str, transaction_id: str, chargeback_meta: d
 
     task_enrich_ip = Task(
         description=(
-            "Using the IP address from the transaction fetched in the previous task: "
-            "1) enrich it with geolocation and ISP info, "
-            "2) fetch all other transactions from that same IP address. "
-            "Return both results as JSON."
+            "Using the IP address from the transaction fetched in the previous task:\n"
+            "1) Call the enrich_ip_address tool with that IP address to get real geolocation and ISP data.\n"
+            "2) Call the fetch_ip_transactions tool with that IP address to get all transactions from that IP.\n"
+            "Use the actual tool results — do not fabricate or infer data. Return both results as JSON."
         ),
-        expected_output="JSON object with 'ip_enrichment' and 'ip_transactions' keys",
+        expected_output="JSON object with 'ip_enrichment' and 'ip_transactions' keys from real tool results",
         agent=enrichment_agent,
         context=[task_fetch_data],
     )

@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Chargeback Dispute Agent</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%236366f1'/><text x='16' y='22' text-anchor='middle' font-size='16' font-family='sans-serif' font-weight='700' fill='white'>AI</text></svg>" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .pulse-dot { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .fade-out { transition: opacity 0.5s ease; opacity: 0; }
+    .spin { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen antialiased">
+
+  <!-- Toast container -->
+  <div id="toasts" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur-sm sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-sm font-bold shadow-lg shadow-indigo-500/25">
+          AI
+        </div>
+        <div>
+          <h1 class="font-semibold text-slate-100 leading-tight">Chargeback Dispute Agent</h1>
+          <p class="text-xs text-slate-500 leading-tight">CrewAI &middot; TiDB Serverless &middot; Composio &middot; Skyfire</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <div id="health-indicator" class="flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700">
+          <div class="w-2 h-2 rounded-full bg-slate-600 pulse-dot"></div>
+          <span class="text-slate-500">Connecting…</span>
+        </div>
+        <button id="refresh-btn" onclick="loadChargebacks()" class="px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors flex items-center gap-1.5">
+          <svg id="refresh-icon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Refresh
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 py-8 space-y-6">
+
+    <!-- Stats -->
+    <div id="stats" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 animate-pulse">
+        <div class="h-3 w-16 bg-slate-800 rounded mb-3"></div>
+        <div class="h-7 w-8 bg-slate-800 rounded"></div>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 animate-pulse">
+        <div class="h-3 w-12 bg-slate-800 rounded mb-3"></div>
+        <div class="h-7 w-8 bg-slate-800 rounded"></div>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 animate-pulse">
+        <div class="h-3 w-20 bg-slate-800 rounded mb-3"></div>
+        <div class="h-7 w-8 bg-slate-800 rounded"></div>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 animate-pulse">
+        <div class="h-3 w-16 bg-slate-800 rounded mb-3"></div>
+        <div class="h-7 w-8 bg-slate-800 rounded"></div>
+      </div>
+    </div>
+
+    <!-- Chargebacks table -->
+    <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+        <h2 class="font-medium text-slate-200">Chargebacks</h2>
+        <span id="row-count" class="text-xs text-slate-600">—</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-slate-800 text-xs text-slate-500 uppercase tracking-wider">
+              <th class="px-6 py-3 text-left font-medium">Chargeback / Transaction</th>
+              <th class="px-6 py-3 text-left font-medium">Customer</th>
+              <th class="px-6 py-3 text-left font-medium">Amount</th>
+              <th class="px-6 py-3 text-left font-medium">Reason</th>
+              <th class="px-6 py-3 text-left font-medium">Status</th>
+              <th class="px-6 py-3 text-left font-medium">Due By</th>
+              <th class="px-6 py-3 text-right font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="chargebacks-tbody">
+            <tr>
+              <td colspan="7" class="px-6 py-16 text-center text-slate-600 text-sm">
+                Loading chargebacks…
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Dispute detail modal -->
+  <div id="modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl">
+      <div class="px-6 py-5 border-b border-slate-800 flex items-center justify-between">
+        <h3 class="font-semibold text-slate-100">Confirm Dispute</h3>
+        <button onclick="closeModal()" class="text-slate-500 hover:text-slate-300 transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div class="px-6 py-5 space-y-3" id="modal-body"></div>
+      <div class="px-6 py-4 border-t border-slate-800 flex gap-3 justify-end">
+        <button onclick="closeModal()" class="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 transition-colors">Cancel</button>
+        <button id="modal-confirm-btn" class="px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-colors">
+          Run Dispute Pipeline
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Track client-side processing state (pipeline running but DB not yet updated)
+    const processing = new Set();
+    let pollingIntervals = {};
+
+    // -------------------------------------------------------------------------
+    // Health check
+    // -------------------------------------------------------------------------
+    async function checkHealth() {
+      const el = document.getElementById('health-indicator');
+      try {
+        const r = await fetch('/health', { signal: AbortSignal.timeout(5000) });
+        if (r.ok) {
+          el.innerHTML = `<div class="w-2 h-2 rounded-full bg-green-500"></div><span class="text-green-400">Online</span>`;
+          el.className = el.className.replace('border-slate-700', 'border-green-800');
+        } else throw new Error();
+      } catch {
+        el.innerHTML = `<div class="w-2 h-2 rounded-full bg-red-500"></div><span class="text-red-400">Offline</span>`;
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Load + render
+    // -------------------------------------------------------------------------
+    async function loadChargebacks() {
+      const icon = document.getElementById('refresh-icon');
+      icon.classList.add('spin');
+      try {
+        const r = await fetch('/chargebacks');
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const data = await r.json();
+        renderStats(data);
+        renderTable(data);
+      } catch (err) {
+        toast('Failed to load chargebacks: ' + err.message, 'error');
+      } finally {
+        icon.classList.remove('spin');
+      }
+    }
+
+    function renderStats(data) {
+      const counts = {
+        total:        data.length,
+        open:         data.filter(c => c.status === 'open' && !processing.has(c.chargeback_id)).length,
+        processing:   data.filter(c => processing.has(c.chargeback_id)).length,
+        under_review: data.filter(c => c.status === 'under_review').length,
+        submitted:    data.filter(c => c.status === 'submitted').length,
+      };
+
+      const cards = [
+        { label: 'Total',        value: counts.total,        color: 'text-slate-200',  dot: 'bg-slate-500' },
+        { label: 'Open',         value: counts.open,         color: 'text-amber-400',  dot: 'bg-amber-500' },
+        { label: 'Under Review', value: counts.under_review, color: 'text-indigo-400', dot: 'bg-indigo-500' },
+        { label: 'Submitted',    value: counts.submitted,    color: 'text-green-400',  dot: 'bg-green-500' },
+      ];
+
+      document.getElementById('stats').innerHTML = cards.map(c => `
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-start justify-between">
+          <div>
+            <p class="text-xs text-slate-500 uppercase tracking-wider mb-1.5">${c.label}</p>
+            <p class="text-3xl font-bold ${c.color}">${c.value}</p>
+          </div>
+          <div class="w-2.5 h-2.5 rounded-full ${c.dot} mt-1 opacity-70"></div>
+        </div>
+      `).join('');
+    }
+
+    function statusBadge(status, isProcessing) {
+      if (isProcessing) {
+        return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-950 text-purple-300 border border-purple-800/60">
+          <span class="w-1.5 h-1.5 rounded-full bg-purple-400 pulse-dot"></span>Processing
+        </span>`;
+      }
+      const map = {
+        open:         'bg-amber-950 text-amber-300 border-amber-800/60',
+        under_review: 'bg-indigo-950 text-indigo-300 border-indigo-800/60',
+        submitted:    'bg-green-950 text-green-300 border-green-800/60',
+        failed:       'bg-red-950 text-red-300 border-red-800/60',
+      };
+      const cls = map[status] || 'bg-slate-800 text-slate-400 border-slate-700';
+      const label = status.replace(/_/g, ' ');
+      return `<span class="inline-block px-2.5 py-1 rounded-full text-xs font-medium border ${cls}">${label}</span>`;
+    }
+
+    function fmtAmount(cents, currency) {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency', currency: currency || 'USD', minimumFractionDigits: 2
+      }).format(cents / 100);
+    }
+
+    function fmtDate(d) {
+      if (!d || d === 'None') return '—';
+      try {
+        return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      } catch { return d; }
+    }
+
+    function fmtDateTime(d) {
+      if (!d || d === 'None') return null;
+      try {
+        return new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      } catch { return d; }
+    }
+
+    function renderTable(data) {
+      const count = data.length;
+      document.getElementById('row-count').textContent = `${count} chargeback${count !== 1 ? 's' : ''}`;
+
+      if (!count) {
+        document.getElementById('chargebacks-tbody').innerHTML = `
+          <tr><td colspan="7" class="px-6 py-16 text-center text-slate-600">
+            No chargebacks found. Run <code class="text-slate-500 mono text-xs">uv run seed.py</code> to add sample data.
+          </td></tr>`;
+        return;
+      }
+
+      document.getElementById('chargebacks-tbody').innerHTML = data.map(cb => {
+        const isProcessing = processing.has(cb.chargeback_id);
+        const canDispute = cb.status === 'open' && !isProcessing;
+        const submittedAt = fmtDateTime(cb.dispute_submitted_at);
+
+        return `
+          <tr class="border-b border-slate-800/50 hover:bg-slate-800/20 transition-colors" id="row-${cb.chargeback_id.replace(/[^a-z0-9]/gi, '_')}">
+            <td class="px-6 py-4">
+              <div class="mono text-xs text-indigo-400 font-medium">${cb.chargeback_id}</div>
+              <div class="mono text-xs text-slate-600 mt-0.5">${cb.transaction_id}</div>
+            </td>
+            <td class="px-6 py-4">
+              <div class="text-slate-300 text-sm">${cb.customer_name || '—'}</div>
+              <div class="text-xs text-slate-600 mt-0.5">${cb.customer_email || '—'}</div>
+            </td>
+            <td class="px-6 py-4">
+              <span class="font-semibold text-slate-200 mono text-sm">${fmtAmount(cb.amount_cents, cb.currency)}</span>
+            </td>
+            <td class="px-6 py-4 max-w-[180px]">
+              <div class="mono text-xs text-slate-400 font-medium">${cb.reason_code || '—'}</div>
+              <div class="text-xs text-slate-600 mt-0.5 truncate" title="${cb.reason_description || ''}">${cb.reason_description || ''}</div>
+            </td>
+            <td class="px-6 py-4">
+              ${statusBadge(cb.status, isProcessing)}
+              ${submittedAt ? `<div class="text-xs text-slate-600 mt-1">${submittedAt}</div>` : ''}
+            </td>
+            <td class="px-6 py-4 text-sm text-slate-500">${fmtDate(cb.evidence_due_by)}</td>
+            <td class="px-6 py-4 text-right">
+              ${canDispute
+                ? `<button onclick="confirmDispute('${cb.chargeback_id}', '${(cb.customer_name || '').replace(/'/g, "\\'")}', ${cb.amount_cents}, '${cb.currency}')"
+                    class="px-3 py-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 rounded-lg transition-colors shadow-sm shadow-indigo-500/20">
+                    ▶ Run Dispute
+                  </button>`
+                : isProcessing
+                  ? `<span class="text-xs text-slate-500 flex items-center gap-1.5 justify-end">
+                      <svg class="w-3 h-3 spin" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Running…
+                    </span>`
+                  : cb.status === 'under_review'
+                    ? `<span class="text-xs text-indigo-500">Under review</span>`
+                    : `<span class="text-xs text-green-600">Submitted</span>`
+              }
+            </td>
+          </tr>`;
+      }).join('');
+    }
+
+    // -------------------------------------------------------------------------
+    // Modal
+    // -------------------------------------------------------------------------
+    let pendingDisputeId = null;
+
+    function confirmDispute(cbId, customerName, amountCents, currency) {
+      pendingDisputeId = cbId;
+      document.getElementById('modal-body').innerHTML = `
+        <p class="text-slate-400 text-sm">The AI pipeline will gather evidence, generate a PDF, and submit the dispute.</p>
+        <div class="bg-slate-800/60 border border-slate-700 rounded-lg p-4 space-y-2 text-sm">
+          <div class="flex justify-between">
+            <span class="text-slate-500">Chargeback</span>
+            <span class="mono text-indigo-400 text-xs">${cbId}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">Customer</span>
+            <span class="text-slate-300">${customerName || '—'}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">Amount</span>
+            <span class="text-slate-200 font-semibold">${fmtAmount(amountCents, currency)}</span>
+          </div>
+        </div>
+        <p class="text-xs text-slate-600">This may take 1–3 minutes depending on agent response times.</p>
+      `;
+      document.getElementById('modal-confirm-btn').onclick = () => {
+        closeModal();
+        triggerDispute(cbId);
+      };
+      document.getElementById('modal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.add('hidden');
+      pendingDisputeId = null;
+    }
+
+    document.getElementById('modal').addEventListener('click', e => {
+      if (e.target === document.getElementById('modal')) closeModal();
+    });
+
+    // -------------------------------------------------------------------------
+    // Dispute pipeline
+    // -------------------------------------------------------------------------
+    async function triggerDispute(cbId) {
+      try {
+        const r = await fetch(`/dispute/${cbId}`, { method: 'POST' });
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          toast(`Error: ${err.detail || 'Failed to start dispute'}`, 'error');
+          return;
+        }
+        processing.add(cbId);
+        toast(`Pipeline started for ${cbId}`, 'success');
+        await loadChargebacks();
+        startPolling(cbId);
+      } catch (err) {
+        toast('Network error: ' + err.message, 'error');
+      }
+    }
+
+    function startPolling(cbId) {
+      if (pollingIntervals[cbId]) return;
+      pollingIntervals[cbId] = setInterval(async () => {
+        try {
+          const r = await fetch(`/dispute/${cbId}/status`);
+          if (!r.ok) return;
+          const data = await r.json();
+          if (data.status !== 'open') {
+            processing.delete(cbId);
+            clearInterval(pollingIntervals[cbId]);
+            delete pollingIntervals[cbId];
+            const label = data.status.replace(/_/g, ' ');
+            toast(`Dispute ${cbId} → ${label}`, data.status === 'under_review' ? 'success' : 'info');
+            await loadChargebacks();
+          }
+        } catch {}
+      }, 4000);
+    }
+
+    // -------------------------------------------------------------------------
+    // Toast
+    // -------------------------------------------------------------------------
+    function toast(message, type = 'info') {
+      const colors = {
+        success: 'bg-green-950 border-green-700/60 text-green-100',
+        error:   'bg-red-950 border-red-700/60 text-red-100',
+        info:    'bg-slate-800 border-slate-700 text-slate-100',
+      };
+      const icons = {
+        success: '✓',
+        error:   '✕',
+        info:    'ℹ',
+      };
+      const el = document.createElement('div');
+      el.className = `pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl border text-sm shadow-xl backdrop-blur-sm transition-all ${colors[type] || colors.info}`;
+      el.innerHTML = `<span class="opacity-70 text-xs mt-0.5">${icons[type] || icons.info}</span><span>${message}</span>`;
+      document.getElementById('toasts').appendChild(el);
+      setTimeout(() => el.classList.add('fade-out'), 3500);
+      setTimeout(() => el.remove(), 4100);
+    }
+
+    // -------------------------------------------------------------------------
+    // Init
+    // -------------------------------------------------------------------------
+    checkHealth();
+    loadChargebacks();
+    setInterval(checkHealth, 30000);
+    // Auto-refresh every 15s (faster if something is processing)
+    setInterval(() => loadChargebacks(), 15000);
+  </script>
+</body>
+</html>

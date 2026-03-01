@@ -47,19 +47,24 @@ uv sync
 cp .env.example .env
 # Edit .env — at minimum set DATABASE_URL and GROQ_API_KEY
 
-# 3. Seed the database
+# 3. Seed the database (creates tables + 5 demo chargebacks across 3 customers)
 uv run seed.py
 
 # 4. Start the server
 uv run uvicorn main:app --reload
+# → Dashboard at http://localhost:8000
+# → API docs at http://localhost:8000/docs
 
-# 5. Trigger a demo dispute
+# 5. Trigger a demo dispute (or use the dashboard)
 curl -X POST http://localhost:8000/dispute/cb_demo_001
 
 # 6. Check status
 curl http://localhost:8000/dispute/cb_demo_001/status
 
-# Or run the end-to-end demo script (no server needed)
+# Reset all chargebacks back to open for another demo run (no reseed needed)
+uv run seed.py --reset
+
+# Or run the end-to-end pipeline locally without a server
 uv run demo.py
 ```
 
@@ -91,16 +96,18 @@ Render is the simplest path: connect your GitHub repo and it deploys automatical
 5. Add environment variables (under **Environment**):
 
    ```
-   DATABASE_URL        = mysql://user:pass@host:4000/chargebacks?sslaccept=strict
-   GROQ_API_KEY        = gsk_...
-   COMPOSIO_API_KEY    = ...
+   DATABASE_URL            = mysql://user:pass@host:4000/chargebacks
+   GROQ_API_KEY            = gsk_...
+   COMPOSIO_API_KEY        = ...
    DISPUTE_RECIPIENT_EMAIL = disputes@yourprocessor.com
-   SKYFIRE_API_KEY     = ...
-   IPINFO_TOKEN        = ...
-   PDF_OUTPUT_DIR      = /tmp/output
+   SKYFIRE_API_KEY         = ...
+   IPINFO_TOKEN            = ...
+   PDF_OUTPUT_DIR          = /tmp/output
    ```
 
-   > **Note:** On Render's free tier, the filesystem is ephemeral. Set `PDF_OUTPUT_DIR=/tmp/output`. PDFs are submitted via Composio before the process may restart.
+   > **SSL note:** SSL is enabled by default — no `?sslaccept=strict` needed in the URL. To disable (not recommended), append `?ssl=false`.
+
+   > **Filesystem note:** Render's free tier has an ephemeral filesystem. Set `PDF_OUTPUT_DIR=/tmp/output`. PDFs are emailed via Composio before the process may restart.
 
 6. Click **Deploy**. Your service will be live at `https://<name>.onrender.com`.
 
@@ -185,16 +192,16 @@ CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
 
 | Variable | Required | Description |
 |---|---|---|
-| `DATABASE_URL` | Yes* | Full MySQL connection string (preferred) |
+| `DATABASE_URL` | Yes* | MySQL connection string — `mysql://user:pass@host:4000/db` |
 | `TIDB_HOST` | Yes* | TiDB host (if not using DATABASE_URL) |
 | `TIDB_USER` | Yes* | TiDB username |
 | `TIDB_PASSWORD` | Yes* | TiDB password |
 | `TIDB_DATABASE` | Yes* | Database name (default: `chargebacks`) |
-| `GROQ_API_KEY` | Yes | Powers CrewAI agents via Groq (free tier available) |
-| `COMPOSIO_API_KEY` | No | Email submission via Composio |
+| `GROQ_API_KEY` | Yes | Powers all CrewAI agents via Groq (`gpt-oss-120b`) |
+| `COMPOSIO_API_KEY` | No | Email submission via Composio Gmail/Outlook |
 | `DISPUTE_RECIPIENT_EMAIL` | No | Where to email the dispute PDF |
-| `SKYFIRE_API_KEY` | No | Micro-payments for enrichment APIs |
-| `IPINFO_TOKEN` | No | IP geolocation (50k/month free) |
+| `SKYFIRE_API_KEY` | No | Micro-payments for enrichment API calls |
+| `IPINFO_TOKEN` | No | IP geolocation (50k/month free without token) |
 | `WEBHOOK_SECRET` | No | Stripe webhook signing secret |
 | `PDF_OUTPUT_DIR` | No | PDF output path (default: `./output`) |
 
@@ -206,8 +213,10 @@ CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
 
 | Method | Path | Description |
 |---|---|---|
+| `GET` | `/` | Dashboard UI |
+| `GET` | `/chargebacks` | List all chargebacks as JSON |
 | `GET` | `/health` | Liveness check |
 | `POST` | `/webhook/chargeback` | Stripe webhook receiver |
 | `POST` | `/dispute/{id}` | Manually trigger dispute pipeline |
-| `GET` | `/dispute/{id}/status` | Check dispute status |
+| `GET` | `/dispute/{id}/status` | Check dispute status and PDF path |
 | `GET` | `/docs` | Interactive API docs (Swagger UI) |

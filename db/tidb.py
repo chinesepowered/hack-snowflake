@@ -24,9 +24,14 @@ def _parse_database_url(url: str) -> dict:
     parsed = urlparse(url)
     # Strip driver prefix (mysql+pymysql → mysql)
     qs = parse_qs(parsed.query)
-    # Detect SSL from common query params
+    # Default SSL on; only disable if URL explicitly opts out (ssl=false/0/disable/no/none)
     ssl_params = {"sslaccept", "ssl", "ssl_mode", "tls"}
-    use_ssl = bool(ssl_params & set(k.lower() for k in qs))
+    no_ssl_values = {"false", "0", "disable", "no", "none"}
+    use_ssl = not any(
+        str(v[0]).lower() in no_ssl_values
+        for k, v in qs.items()
+        if k.lower() in ssl_params
+    )
     return {
         "host": parsed.hostname,
         "port": parsed.port or 4000,
@@ -131,6 +136,27 @@ def get_ip_transactions(ip_address: str) -> list[dict]:
                 LIMIT 50
                 """,
                 (ip_address,),
+            )
+            return cur.fetchall()
+
+
+def list_chargebacks(limit: int = 200) -> list[dict]:
+    """All chargebacks newest-first, joined with transaction customer info."""
+    with _get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT c.chargeback_id, c.transaction_id, c.reason_code,
+                       c.reason_description, c.amount_cents, c.currency,
+                       c.status, c.evidence_due_by, c.pdf_path,
+                       c.dispute_submitted_at, c.created_at,
+                       t.customer_email, t.customer_name
+                FROM chargebacks c
+                LEFT JOIN transactions t ON c.transaction_id = t.transaction_id
+                ORDER BY c.created_at DESC
+                LIMIT %s
+                """,
+                (limit,),
             )
             return cur.fetchall()
 

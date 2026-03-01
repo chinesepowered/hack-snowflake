@@ -23,9 +23,19 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 
+# Suppress noisy LiteLLM internal loggers (apscheduler/proxy errors unrelated to our usage)
+logging.getLogger("LiteLLM").setLevel(logging.CRITICAL)
+logging.getLogger("LiteLLM Router").setLevel(logging.CRITICAL)
+logging.getLogger("LiteLLM Proxy").setLevel(logging.CRITICAL)
+logging.getLogger("litellm").setLevel(logging.CRITICAL)
+# Suppress OpenAI client retry INFO chatter (Groq occasionally returns empty on first attempt)
+logging.getLogger("openai").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 import httpx
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from agents.crew import run_dispute_crew
@@ -39,6 +49,7 @@ log = logging.getLogger("dispute-agent")
 PDF_OUTPUT_DIR = os.environ.get("PDF_OUTPUT_DIR", "./output")
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 COMPOSIO_API_KEY = os.environ.get("COMPOSIO_API_KEY", "")
+MOCK_EMAIL = os.environ.get("MOCK_EMAIL", "").lower() in ("1", "true", "yes")
 
 
 # ---------------------------------------------------------------------------
@@ -115,11 +126,25 @@ async def _run_dispute_pipeline(payload: ChargebackPayload) -> None:
 
     try:
         # 1. CrewAI multi-agent evidence gathering
-        evidence = run_dispute_crew(
-            chargeback_id=cb_id,
-            transaction_id=txn_id,
-            chargeback_meta=payload.model_dump(),
-        )
+        # Retry once on transient LLM errors (gpt-oss-120b occasionally returns
+        # an empty response; CrewAI then retries internally with tool_choice=none
+        # but the model still generates a tool call, causing a Groq 400).
+        try:
+            evidence = run_dispute_crew(
+                chargeback_id=cb_id,
+                transaction_id=txn_id,
+                chargeback_meta=payload.model_dump(),
+            )
+        except Exception as crew_exc:
+            if "tool choice" in str(crew_exc).lower() or "none or empty" in str(crew_exc).lower():
+                log.warning("Transient LLM error, retrying crew once: %s", crew_exc)
+                evidence = run_dispute_crew(
+                    chargeback_id=cb_id,
+                    transaction_id=txn_id,
+                    chargeback_meta=payload.model_dump(),
+                )
+            else:
+                raise
 
         # 2. Generate PDF
         pdf_path = generate_dispute_pdf(evidence, output_dir=PDF_OUTPUT_DIR)
@@ -150,6 +175,10 @@ async def _submit_via_composio(
     Composio provides pre-built integrations for Gmail, Outlook, and Stripe Disputes API.
     We call Composio's action execution endpoint directly here.
     """
+    if MOCK_EMAIL:
+        log.info("[MOCK] Email submission skipped (MOCK_EMAIL=true) — PDF saved at %s", pdf_path)
+        return
+
     if not COMPOSIO_API_KEY:
         log.warning("COMPOSIO_API_KEY not set — skipping submission")
         return
@@ -202,6 +231,20 @@ async def _submit_via_composio(
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
+@app.get("/", include_in_schema=False)
+async def frontend():
+    return FileResponse("frontend/index.html")
+
+
+@app.get("/chargebacks")
+async def list_chargebacks():
+    rows = tidb.list_chargebacks()
+    return [
+        {k: str(v) if isinstance(v, datetime) else v for k, v in row.items()}
+        for row in rows
+    ]
+
 
 @app.get("/health")
 async def health():
