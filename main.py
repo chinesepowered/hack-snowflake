@@ -126,11 +126,25 @@ async def _run_dispute_pipeline(payload: ChargebackPayload) -> None:
 
     try:
         # 1. CrewAI multi-agent evidence gathering
-        evidence = run_dispute_crew(
-            chargeback_id=cb_id,
-            transaction_id=txn_id,
-            chargeback_meta=payload.model_dump(),
-        )
+        # Retry once on transient LLM errors (gpt-oss-120b occasionally returns
+        # an empty response; CrewAI then retries internally with tool_choice=none
+        # but the model still generates a tool call, causing a Groq 400).
+        try:
+            evidence = run_dispute_crew(
+                chargeback_id=cb_id,
+                transaction_id=txn_id,
+                chargeback_meta=payload.model_dump(),
+            )
+        except Exception as crew_exc:
+            if "tool choice" in str(crew_exc).lower() or "none or empty" in str(crew_exc).lower():
+                log.warning("Transient LLM error, retrying crew once: %s", crew_exc)
+                evidence = run_dispute_crew(
+                    chargeback_id=cb_id,
+                    transaction_id=txn_id,
+                    chargeback_meta=payload.model_dump(),
+                )
+            else:
+                raise
 
         # 2. Generate PDF
         pdf_path = generate_dispute_pdf(evidence, output_dir=PDF_OUTPUT_DIR)

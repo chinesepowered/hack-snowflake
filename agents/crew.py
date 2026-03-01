@@ -117,11 +117,11 @@ def run_dispute_crew(chargeback_id: str, transaction_id: str, chargeback_meta: d
     task_enrich_ip = Task(
         description=(
             "Using the IP address from the transaction fetched in the previous task:\n"
-            "1) You MUST call the enrich_ip_address tool with that IP address — do NOT guess or fabricate geolocation data.\n"
-            "2) You MUST call the fetch_ip_transactions tool with that IP address — do NOT guess transaction lists.\n"
-            "Both tool calls are required. Return both results as JSON."
+            "1) Call the enrich_ip_address tool with that IP address to get real geolocation and ISP data.\n"
+            "2) Call the fetch_ip_transactions tool with that IP address to get all transactions from that IP.\n"
+            "Use the actual tool results — do not fabricate or infer data. Return both results as JSON."
         ),
-        expected_output="JSON object with 'ip_enrichment' and 'ip_transactions' keys, populated from real tool results",
+        expected_output="JSON object with 'ip_enrichment' and 'ip_transactions' keys from real tool results",
         agent=enrichment_agent,
         context=[task_fetch_data],
     )
